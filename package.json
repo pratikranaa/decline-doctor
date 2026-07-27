@@ -1,0 +1,24 @@
+{
+  "name": "decline-doctor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI payment-failure root-cause agent — diagnoses declined payments, decides retry-safety, and generates a recovery playbook.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  }
+}
