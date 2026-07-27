@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SAMPLES } from "../lib/samples";
+import Nav from "./components/Nav";
 
 interface DiagnosisResult {
   category: string;
@@ -59,7 +60,9 @@ export default function Home() {
   }
 
   return (
-    <div className="wrap">
+    <>
+      <Nav active="home" />
+      <div className="wrap">
       <div className="brand">
         <div className="logo">🩺</div>
         <div>
@@ -182,6 +185,7 @@ export default function Home() {
         so a hard/fraud decline can never be talked into an unsafe auto-retry. Runs with or without an{" "}
         <code>ANTHROPIC_API_KEY</code> (deterministic engine as fallback). Built for the Razorpay AI Builders challenge.
       </div>
-    </div>
+      </div>
+    </>
   );
 }
