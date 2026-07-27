@@ -15,17 +15,16 @@
  * stands on its own; the LLM adds nuance and the natural-language write-ups.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import {
   TAXONOMY,
   RETRY_STRATEGY,
   MAX_RETRIES,
-  SIGNAL_INDEX,
   classifyBySignals,
   needsCustomerMessage,
   type Category,
   type RetryStrategy,
 } from "./taxonomy";
+import { activeProvider, llmComplete } from "./llm";
 
 export interface DiagnoseInput {
   raw: string;
@@ -50,10 +49,8 @@ export interface DiagnosisResult {
   customerMessage: string | null;
   reasoning: string[]; // transparent decision trace
   guardrails: string[]; // safety flags surfaced by verification
-  engine: "llm+taxonomy" | "taxonomy-only";
+  engine: string; // e.g. "gemini+taxonomy", "anthropic+taxonomy", or "taxonomy-only"
 }
-
-const MODEL = "claude-sonnet-5";
 
 const OWNER_LABEL: Record<string, string> = {
   customer: "Customer",
@@ -176,11 +173,10 @@ Rules:
 Respond with ONLY a JSON object: {"category": "...", "confidence": 0.0, "rootCause": "...", "reasoning": ["...", "..."]}`;
 
 export async function diagnose(input: DiagnoseInput): Promise<DiagnosisResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return diagnoseDeterministic(input);
+  const provider = activeProvider();
+  if (!provider) return diagnoseDeterministic(input);
 
   try {
-    const client = new Anthropic({ apiKey });
     const ctx = [
       `Raw response: ${input.raw}`,
       input.amount != null ? `Amount: ${input.amount} ${input.currency ?? ""}`.trim() : null,
@@ -190,15 +186,8 @@ export async function diagnose(input: DiagnoseInput): Promise<DiagnosisResult> {
       .filter(Boolean)
       .join("\n");
 
-    const msg = await client.messages.create({
-      model: MODEL,
-      max_tokens: 700,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: ctx }],
-    });
-
-    const text = msg.content.find((b) => b.type === "text");
-    const parsed = extractJson(text && "text" in text ? text.text : "");
+    const raw = await llmComplete({ system: SYSTEM_PROMPT, user: ctx, maxTokens: 700, json: true });
+    const parsed = extractJson(raw);
     if (!parsed || !(parsed.category in TAXONOMY)) return diagnoseDeterministic(input);
 
     const category = parsed.category as Category;
@@ -211,40 +200,30 @@ export async function diagnose(input: DiagnoseInput): Promise<DiagnosisResult> {
 
     let customerMessage: string | null = null;
     if (needsCustomerMessage(category)) {
-      customerMessage = await generateCustomerMessage(client, input, category).catch(
-        () => defaultCustomerMessage(category),
+      customerMessage = await generateCustomerMessage(input, category).catch(() =>
+        defaultCustomerMessage(category),
       );
     }
 
-    return buildFromCategory(category, confidence, rootCause, reasoning, "llm+taxonomy", customerMessage);
+    return buildFromCategory(category, confidence, rootCause, reasoning, `${provider}+taxonomy`, customerMessage);
   } catch {
     // Any LLM/transport failure → deterministic engine still delivers a full answer.
     return diagnoseDeterministic(input);
   }
 }
 
-async function generateCustomerMessage(
-  client: Anthropic,
-  input: DiagnoseInput,
-  category: Category,
-): Promise<string> {
-  const msg = await client.messages.create({
-    model: MODEL,
-    max_tokens: 200,
-    system:
-      "Write a single short, warm, non-technical recovery message to a customer whose payment failed. " +
-      "One or two sentences. No blame, no jargon, no reason codes. Give the one action that fixes it. " +
-      "For fraud/security reasons, never state that a card was lost/stolen/blocked — just ask for another method. " +
-      "Output only the message text.",
-    messages: [
-      {
-        role: "user",
-        content: `Failure class: ${TAXONOMY[category].label}. Context: ${input.raw}`,
-      },
-    ],
-  });
-  const text = msg.content.find((b) => b.type === "text");
-  const out = text && "text" in text ? text.text.trim() : "";
+async function generateCustomerMessage(input: DiagnoseInput, category: Category): Promise<string> {
+  const out = (
+    await llmComplete({
+      maxTokens: 200,
+      user: `Failure class: ${TAXONOMY[category].label}. Context: ${input.raw}`,
+      system:
+        "Write a single short, warm, non-technical recovery message to a customer whose payment failed. " +
+        "One or two sentences. No blame, no jargon, no reason codes. Give the one action that fixes it. " +
+        "For fraud/security reasons, never state that a card was lost/stolen/blocked — just ask for another method. " +
+        "Output only the message text.",
+    })
+  ).trim();
   return out || defaultCustomerMessage(category);
 }
 
