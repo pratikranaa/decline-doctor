@@ -266,3 +266,41 @@ export function needsCustomerMessage(category: Category): boolean {
   const owner = TAXONOMY[category].owner;
   return owner === "customer"; // customer must change something; a message drives ~50% of recovery
 }
+
+/**
+ * Expected recovery probability *given the correct action is taken*, per class.
+ * Illustrative but grounded: transient infra recovers almost always; fraud/stolen
+ * almost never; customer-action classes land in between. Used to estimate how
+ * much declined revenue is realistically recoverable across a batch.
+ */
+export const RECOVERY_LIKELIHOOD: Record<Category, number> = {
+  insufficient_funds: 0.5,
+  do_not_honor: 0.35,
+  card_expired: 0.6,
+  invalid_details: 0.4,
+  authentication_failed: 0.7,
+  risk_blocked: 0.05,
+  limit_exceeded: 0.45,
+  issuer_unavailable: 0.85,
+  technical_error: 0.8,
+  config_error: 0.9,
+  lost_or_stolen: 0.0,
+  unknown: 0.1,
+};
+
+/** How a decision is dispatched — the three lanes a recovery pass routes into. */
+export type Lane = "auto" | "customer" | "manual";
+
+export function laneFor(strategy: RetryStrategy): Lane {
+  switch (strategy) {
+    case "retry_now":
+    case "retry_scheduled":
+    case "retry_with_updater":
+    case "route_alternate":
+      return "auto"; // the retry engine can action this without a human
+    case "dunning":
+      return "customer"; // needs the customer to act (send a message)
+    case "do_not_retry":
+      return "manual"; // stop / manual review
+  }
+}

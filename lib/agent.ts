@@ -118,8 +118,8 @@ function buildFromCategory(
   };
 }
 
-/** Deterministic fallback — full diagnosis with zero LLM calls. */
-function diagnoseDeterministic(input: DiagnoseInput): DiagnosisResult {
+/** Deterministic diagnosis with zero LLM calls — used as fallback and for fast batch triage. */
+export function diagnoseDeterministic(input: DiagnoseInput): DiagnosisResult {
   const category = classifyBySignals(input.raw) ?? "unknown";
   const t = TAXONOMY[category];
   const reasoning = [

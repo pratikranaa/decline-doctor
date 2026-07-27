@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function Nav({ active }: { active?: "home" | "how" | "thesis" }) {
+export default function Nav({ active }: { active?: "home" | "how" | "thesis" | "recovery" }) {
   return (
     <nav className="nav">
       <Link href="/" className="nav-brand">
@@ -9,6 +9,9 @@ export default function Nav({ active }: { active?: "home" | "how" | "thesis" }) 
       </Link>
       <Link href="/" className={`nav-link ${active === "home" ? "active" : ""}`}>
         Try it
+      </Link>
+      <Link href="/recovery" className={`nav-link ${active === "recovery" ? "active" : ""}`}>
+        Console
       </Link>
       <Link href="/how-it-works" className={`nav-link ${active === "how" ? "active" : ""}`}>
         How it works
