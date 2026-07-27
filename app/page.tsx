@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { SAMPLES } from "../lib/samples";
+import { recordOutcome } from "../lib/learning";
+import type { Category } from "../lib/taxonomy";
 import Nav from "./components/Nav";
 
 interface DiagnosisResult {
@@ -39,6 +42,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiagnosisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [logged, setLogged] = useState<null | boolean>(null);
 
   async function run(input?: { raw: string; amount?: number; currency?: string; method?: string; attemptNumber?: number }) {
     const payload = input ?? { raw };
@@ -46,6 +50,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setLogged(null);
     try {
       const res = await fetch("/api/diagnose", {
         method: "POST",
@@ -233,6 +238,42 @@ export default function Home() {
                 <li key={i}>{r}</li>
               ))}
             </ul>
+          </div>
+
+          <div className="card feedback">
+            {logged === null ? (
+              <>
+                <p className="section-title" style={{ margin: 0 }}>
+                  Close the loop — did the recommended action recover the payment?
+                </p>
+                <div className="fb-btns">
+                  <button
+                    className="fb yes"
+                    onClick={() => {
+                      recordOutcome(result.category as Category, true);
+                      setLogged(true);
+                    }}
+                  >
+                    ✓ Recovered
+                  </button>
+                  <button
+                    className="fb no"
+                    onClick={() => {
+                      recordOutcome(result.category as Category, false);
+                      setLogged(false);
+                    }}
+                  >
+                    ✗ Still failed
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="fb-done">
+                Logged as <strong>{logged ? "recovered" : "failed"}</strong> for <em>{result.categoryLabel}</em>. The
+                model updates this class's recovery estimate — see it move on the{" "}
+                <Link href="/learning">Learning</Link> page.
+              </p>
+            )}
           </div>
         </div>
       )}

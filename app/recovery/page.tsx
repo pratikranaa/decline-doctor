@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Nav from "../components/Nav";
 import { SAMPLE_BATCH } from "../../lib/batch-samples";
+import { loadOutcomes, learnedLikelihoods } from "../../lib/learning";
 
 interface Decision {
+  category: string;
   categoryLabel: string;
   retryStrategy: string;
   lane: "auto" | "customer" | "manual";
@@ -44,6 +46,7 @@ export default function Recovery() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [learnedApplied, setLearnedApplied] = useState(0);
 
   async function run(declines: any[]) {
     setLoading(true);
@@ -54,8 +57,26 @@ export default function Recovery() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ declines }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Batch failed.");
+      const data: Summary = await res.json();
+      if (!res.ok) throw new Error((data as any).error || "Batch failed.");
+
+      // Close the loop: re-estimate recoverable using learned posteriors where we have outcomes.
+      const outcomes = loadOutcomes();
+      if (outcomes.length > 0) {
+        const learned = learnedLikelihoods(outcomes);
+        let recoverable = 0;
+        data.decisions = data.decisions.map((d) => {
+          const rate = learned[d.category];
+          const rec = rate != null ? Math.round(d.amount * rate) : d.recoverableAmount;
+          recoverable += rec;
+          return { ...d, recoverableAmount: rec };
+        });
+        data.recoverable = recoverable;
+        data.recoveryRatePct = data.atRisk > 0 ? Math.round((recoverable / data.atRisk) * 100) : 0;
+        setLearnedApplied(outcomes.length);
+      } else {
+        setLearnedApplied(0);
+      }
       setSummary(data);
     } catch (e: any) {
       setError(e.message);
@@ -125,7 +146,9 @@ export default function Recovery() {
               <div className="kpi good">
                 <div className="k-label">Recoverable</div>
                 <div className="k-num">{money(summary.recoverable, summary.currency)}</div>
-                <div className="k-sub">with the right action per decline</div>
+                <div className="k-sub">
+                  {learnedApplied > 0 ? `learned from ${learnedApplied} outcomes` : "with the right action per decline"}
+                </div>
               </div>
               <div className="kpi accent">
                 <div className="k-label">Recovery rate</div>

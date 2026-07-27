@@ -819,3 +819,134 @@ table.dec td.amt {
   background: var(--green-soft);
   border-color: #a6f4c5;
 }
+
+/* ---- outcome feedback control ---- */
+.feedback .fb-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.fb {
+  border-radius: 9px;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  box-shadow: none;
+}
+.fb.yes {
+  background: var(--green-soft);
+  color: var(--green);
+  border-color: #a6f4c5;
+}
+.fb.no {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: #fecdca;
+}
+.fb-done {
+  font-size: 13.5px;
+  color: var(--text-2);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* ---- learning page ---- */
+.learn-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 92px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.learn-row:last-child {
+  border-bottom: none;
+}
+@media (max-width: 640px) {
+  .learn-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+}
+.learn-row .lr-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.learn-row .lr-obs {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.track {
+  position: relative;
+  height: 26px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.track .prior-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--muted);
+  opacity: 0.6;
+}
+.track .post-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 7px 0 0 7px;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  opacity: 0.85;
+}
+.learn-row .lr-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.lr-num .post {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.lr-num .delta {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.delta.up {
+  color: var(--green);
+}
+.delta.down {
+  color: var(--red);
+}
+.delta.flat {
+  color: var(--muted);
+}
+.legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 4px 0 6px;
+}
+.legend .sw {
+  display: inline-block;
+  width: 22px;
+  height: 8px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.sw.post {
+  background: linear-gradient(90deg, var(--accent), var(--green));
+}
+.sw.prior {
+  background: var(--muted);
+  width: 2px;
+  height: 14px;
+}
