@@ -20,6 +20,9 @@ interface DiagnosisResult {
   reasoning: string[];
   guardrails: string[];
   engine: string;
+  perceptionSource: "llm" | "signal";
+  decisionPolicy: string;
+  safetyEnforced: boolean;
 }
 
 const STRATEGY_LABEL: Record<string, string> = {
@@ -71,9 +74,10 @@ export default function Home() {
         </div>
       </div>
       <p className="tagline">
-        Every failed payment is lost revenue. Paste a raw gateway decline — Decline Doctor finds the{" "}
-        <strong>root cause</strong>, decides the <strong>retry-safe action</strong>, and drafts the{" "}
-        <strong>customer message</strong>. The diagnosis layer that sits in front of a retry engine.
+        Every failed payment is lost revenue — but the fix depends entirely on <em>why</em> it failed. Paste a raw
+        gateway decline. Decline Doctor finds the <strong>root cause</strong>, decides the{" "}
+        <strong>retry-safe action</strong>, and drafts the <strong>customer message</strong> — the diagnosis layer that
+        sits in front of a retry engine.
       </p>
 
       <div className="card">
@@ -105,8 +109,61 @@ export default function Home() {
         {error && <div className="error">⚠ {error}</div>}
       </div>
 
+      {!result && (
+        <div className="steps">
+          <div className="step">
+            <div className="s-n">1</div>
+            <div className="s-t">
+              Read the decline<span className="who ai">AI</span>
+            </div>
+            <div className="s-d">A language model reads the messy gateway response and classifies the failure.</div>
+          </div>
+          <div className="step">
+            <div className="s-n">2</div>
+            <div className="s-t">
+              Decide the action<span className="who det">rules</span>
+            </div>
+            <div className="s-d">
+              A deterministic taxonomy — not the model — decides whether a retry is safe. Fraud/hard declines are barred
+              from any retry path.
+            </div>
+          </div>
+          <div className="step">
+            <div className="s-n">3</div>
+            <div className="s-t">Recover</div>
+            <div className="s-d">Retry-safe action, backoff, and a customer message — ready for a retry engine to execute.</div>
+          </div>
+        </div>
+      )}
+
       {result && (
         <div className="result">
+          <div className="card">
+            <p className="section-title">How this decision was made</p>
+            <div className="pipeline">
+              <div className="stage ai">
+                <div className="st-h">① Perception · {result.perceptionSource === "llm" ? "AI model" : "signal match"}</div>
+                <div className="st-main">{result.categoryLabel}</div>
+                <div className="st-sub">
+                  confidence {Math.round(result.confidence * 100)}% · {result.engine}
+                </div>
+              </div>
+              <div className="arrow">→</div>
+              <div className={`stage decision ${result.safetyEnforced ? "locked" : ""}`}>
+                <div className="st-h">
+                  ② Decision · deterministic {result.safetyEnforced ? "🔒" : ""}
+                </div>
+                <div className="st-main">{STRATEGY_LABEL[result.retryStrategy] ?? result.retryStrategy}</div>
+                <div className="st-note">{result.decisionPolicy}</div>
+              </div>
+            </div>
+            <div className={`override-banner ${result.safetyEnforced ? "" : "safe"}`}>
+              {result.safetyEnforced
+                ? "🔒 Safety override: the model classified the failure, but the action is enforced by rules — it cannot be talked into an unsafe retry."
+                : "✓ Model classified the failure; the taxonomy set a safe, automatable action."}
+            </div>
+          </div>
+
           <div className="card">
             <div className="verdict">
               <span className="category">{result.categoryLabel}</span>

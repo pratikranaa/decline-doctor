@@ -50,6 +50,11 @@ export interface DiagnosisResult {
   reasoning: string[]; // transparent decision trace
   guardrails: string[]; // safety flags surfaced by verification
   engine: string; // e.g. "gemini+taxonomy", "anthropic+taxonomy", or "taxonomy-only"
+
+  // ---- the perception → decision split (the safety-override hook) ----
+  perceptionSource: "llm" | "signal"; // who classified the decline
+  decisionPolicy: string; // the action the deterministic taxonomy enforced
+  safetyEnforced: boolean; // true when the taxonomy actively bars an unsafe retry the model can't override
 }
 
 const OWNER_LABEL: Record<string, string> = {
@@ -77,10 +82,33 @@ function buildFromCategory(
   reasoning: string[],
   engine: DiagnosisResult["engine"],
   customerMessage: string | null,
+  perceptionSource: "llm" | "signal",
 ): DiagnosisResult {
   const t = TAXONOMY[category];
   const strategy = RETRY_STRATEGY[category];
   const guardrails: string[] = [];
+
+  // The deterministic policy the taxonomy enforces on top of the (fuzzy) classification.
+  const safetyEnforced = strategy === "do_not_retry" || t.hardness === "hard";
+  let decisionPolicy: string;
+  switch (strategy) {
+    case "do_not_retry":
+      decisionPolicy =
+        category === "risk_blocked" || category === "lost_or_stolen"
+          ? "Barred from every retry path. A model cannot authorize a retry for this class — retrying wastes money and escalates risk."
+          : "No auto-retry — the underlying state must change first (e.g. merchant config). Routed to review.";
+      break;
+    case "retry_with_updater":
+      decisionPolicy = `Credential is dead — no blind retry. Refresh via network card-updater first, then at most ${MAX_RETRIES[strategy]} attempts.`;
+      break;
+    case "dunning":
+      decisionPolicy = "Customer must act. Routed to messaging, not to an automatic retry.";
+      break;
+    default:
+      decisionPolicy = `Safe to automate: ${STRATEGY_LABEL[strategy].toLowerCase()}, capped at ${MAX_RETRIES[strategy]} attempts${
+        t.backoffHours ? `, ~${t.backoffHours}h backoff` : ""
+      }.`;
+  }
 
   // Verification: independent-signal corroboration + safety invariants.
   const signalCategory = classifyBySignals(rootCause) ?? null;
@@ -115,6 +143,9 @@ function buildFromCategory(
     reasoning,
     guardrails,
     engine,
+    perceptionSource,
+    decisionPolicy,
+    safetyEnforced,
   };
 }
 
@@ -140,6 +171,7 @@ export function diagnoseDeterministic(input: DiagnoseInput): DiagnosisResult {
     reasoning,
     "taxonomy-only",
     customerMessage,
+    "signal",
   );
 }
 
@@ -205,7 +237,7 @@ export async function diagnose(input: DiagnoseInput): Promise<DiagnosisResult> {
       );
     }
 
-    return buildFromCategory(category, confidence, rootCause, reasoning, `${provider}+taxonomy`, customerMessage);
+    return buildFromCategory(category, confidence, rootCause, reasoning, `${provider}+taxonomy`, customerMessage, "llm");
   } catch {
     // Any LLM/transport failure → deterministic engine still delivers a full answer.
     return diagnoseDeterministic(input);
